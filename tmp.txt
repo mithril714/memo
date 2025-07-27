@@ -1,0 +1,355 @@
+✅ 機能要件まとめ
+入力ファイルは、各行に 時刻 処理 場所 番号 がスペース区切りで記載されたテキストファイル。
+
+指定した「処理」のみ抽出。
+
+出力は、縦軸に時刻、横軸に場所、中身に対応する番号が入る表形式（DataGridView）。
+
+時系列順に表示。
+
+🖼️ GUI イメージ（構成）
+Button：ファイル読み込み
+
+TextBox：抽出対象の処理名入力
+
+DataGridView：結果表示
+
+💻 ソースコード例
+csharp
+コピーする
+編集する
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace ProcessingTableApp
+{
+    public partial class MainForm : Form
+    {
+        private Dictionary<string, Dictionary<string, string>> tableData = new();
+
+        public MainForm()
+        {
+            InitializeComponent();
+        }
+
+        private void btnLoad_Click(object sender, EventArgs e)
+        {
+            string filterProcess = txtProcess.Text.Trim();
+            if (string.IsNullOrEmpty(filterProcess))
+            {
+                MessageBox.Show("処理名を入力してください。");
+                return;
+            }
+
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Filter = "Text Files|*.txt";
+            if (ofd.ShowDialog() == DialogResult.OK)
+            {
+                LoadAndFilterFile(ofd.FileName, filterProcess);
+                DisplayTable();
+            }
+        }
+
+        private void LoadAndFilterFile(string filePath, string targetProcess)
+        {
+            tableData.Clear();
+
+            foreach (var line in File.ReadLines(filePath))
+            {
+                var parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 4) continue;
+
+                string time = parts[0];
+                string process = parts[1];
+                string place = parts[2];
+                string number = parts[3];
+
+                if (process != targetProcess)
+                    continue;
+
+                if (!tableData.ContainsKey(time))
+                    tableData[time] = new Dictionary<string, string>();
+
+                tableData[time][place] = number;
+            }
+        }
+
+        private void DisplayTable()
+        {
+            dataGridView.Rows.Clear();
+            dataGridView.Columns.Clear();
+
+            // 時刻を昇順に並べる
+            var sortedTimes = tableData.Keys.OrderBy(t => t).ToList();
+            var allPlaces = tableData.Values.SelectMany(d => d.Keys).Distinct().OrderBy(p => p).ToList();
+
+            // 列: 場所ごと
+            dataGridView.Columns.Add("Time", "時刻");
+            foreach (var place in allPlaces)
+            {
+                dataGridView.Columns.Add(place, place);
+            }
+
+            // 行: 各時刻ごとに番号を表示
+            foreach (var time in sortedTimes)
+            {
+                var row = new List<string> { time };
+                foreach (var place in allPlaces)
+                {
+                    tableData[time].TryGetValue(place, out string number);
+                    row.Add(number ?? "");
+                }
+                dataGridView.Rows.Add(row.ToArray());
+            }
+        }
+    }
+}
+🧩 GUI のデザイナー要素
+以下を MainForm に配置してください：
+
+TextBox (Name: txtProcess) — 処理名の入力欄
+
+Button (Name: btnLoad) — テキスト：「ファイル読み込み」
+
+Click イベントに btnLoad_Click を接続
+
+DataGridView (Name: dataGridView) — 表の表示欄
+
+📁 入力ファイル例
+makefile
+コピーする
+編集する
+09:00 処理A 場所1 1001
+09:00 処理B 場所2 1002
+09:05 処理A 場所1 1003
+09:10 処理A 場所3 1004
+処理名に「処理A」と入力すると、以下の表が表示されます：
+
+時刻	場所1	場所3
+09:00	1001	
+09:05	1003	
+09:10		1004
+
+📦 拡張案
+出力をCSVとして保存
+
+時刻のフォーマットバリデーション
+
+処理名のプルダウン選択
+
+ご希望であれば、完全な .csproj プロジェクト構成やCSV出力機能付きの拡張版も提供可能です。必要に応じてお知らせください。
+
+
+
+
+
+
+
+
+あなた:
+出力をCSVで保存
+
+
+ChatGPT:
+出力結果を CSVファイルとして保存する機能 を追加するには、以下の2点を行います：
+
+✅【1】保存ボタンの追加（デザイナー）
+Button を1つ追加（例: btnSaveCsv）
+
+テキスト：CSV保存
+
+Click イベントハンドラーに以下の処理を割り当てます。
+
+✅【2】保存処理のコード追加
+csharp
+コピーする
+編集する
+private void btnSaveCsv_Click(object sender, EventArgs e)
+{
+    if (dataGridView.Rows.Count == 0)
+    {
+        MessageBox.Show("保存するデータがありません。");
+        return;
+    }
+
+    SaveFileDialog sfd = new SaveFileDialog
+    {
+        Filter = "CSVファイル|*.csv",
+        FileName = "output.csv"
+    };
+
+    if (sfd.ShowDialog() == DialogResult.OK)
+    {
+        try
+        {
+            using (var writer = new StreamWriter(sfd.FileName, false, System.Text.Encoding.UTF8))
+            {
+                // ヘッダー出力
+                List<string> headers = new();
+                foreach (DataGridViewColumn col in dataGridView.Columns)
+                {
+                    headers.Add(col.HeaderText);
+                }
+                writer.WriteLine(string.Join(",", headers));
+
+                // 行データ出力
+                foreach (DataGridViewRow row in dataGridView.Rows)
+                {
+                    if (!row.IsNewRow)
+                    {
+                        List<string> cells = new();
+                        foreach (DataGridViewCell cell in row.Cells)
+                        {
+                            string value = cell.Value?.ToString()?.Replace("\"", "\"\"") ?? "";
+                            cells.Add($"\"{value}\""); // CSVエスケープ
+                        }
+                        writer.WriteLine(string.Join(",", cells));
+                    }
+                }
+            }
+
+            MessageBox.Show("CSVファイルを保存しました。");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("保存中にエラーが発生しました: " + ex.Message);
+        }
+    }
+}
+🧪 出力CSV例（処理A選択時）
+csv
+コピーする
+編集する
+時刻,場所1,場所3
+09:00,1001,
+09:05,1003,
+09:10,,1004
+📌 備考
+Excelで開けるように UTF-8 + ダブルクォーテーション付き。
+
+カンマや改行が含まれていても正しく保存できます。
+
+ご希望があれば、自動保存・ファイル名指定・Excel形式（.xlsx）対応などの追加も可能です。必要な機能があればお知らせください。
+
+
+
+
+
+
+
+
+あなた:
+最終的には表だけでなく、
+ある時刻でどの場所に何番があるのかを画像で描画したい
+
+
+ChatGPT:
+それは非常に良い拡張案です！
+以下に、**「時刻ごとに場所に番号がある様子を画像として描画」**する方法を提案します。
+Windows Forms + C#で簡易的な「可視化画像生成」を行います。
+
+✅ ゴールのイメージ
+縦軸：時刻
+
+横軸：場所
+
+中のテキスト：番号
+
+表と同様の内容を、画像（PNGなど）として保存または表示
+
+🧩 実装のステップ
+① 描画ボタンを追加
+Button（例: btnDrawImage）
+
+テキスト：「画像として描画」
+
+Clickイベントに処理を追加
+
+② 描画処理のコード（Bitmapへ描画）
+csharp
+コピーする
+編集する
+private void btnDrawImage_Click(object sender, EventArgs e)
+{
+    if (dataGridView.Rows.Count == 0)
+    {
+        MessageBox.Show("描画するデータがありません。");
+        return;
+    }
+
+    int cellWidth = 100;
+    int cellHeight = 30;
+    int headerHeight = 40;
+    int headerWidth = 80;
+
+    int width = headerWidth + dataGridView.Columns.Count * cellWidth;
+    int height = headerHeight + dataGridView.Rows.Count * cellHeight;
+
+    Bitmap bmp = new Bitmap(width, height);
+    using (Graphics g = Graphics.FromImage(bmp))
+    {
+        g.Clear(Color.White);
+        Pen pen = Pens.Gray;
+        Font font = new Font("Arial", 10);
+
+        // 列ヘッダー（場所）
+        for (int col = 0; col < dataGridView.Columns.Count; col++)
+        {
+            string header = dataGridView.Columns[col].HeaderText;
+            Rectangle rect = new Rectangle(headerWidth + col * cellWidth, 0, cellWidth, headerHeight);
+            g.DrawRectangle(pen, rect);
+            g.DrawString(header, font, Brushes.Black, rect, new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+        }
+
+        // 行ヘッダー（時刻）とセル描画
+        for (int row = 0; row < dataGridView.Rows.Count; row++)
+        {
+            if (dataGridView.Rows[row].IsNewRow) continue;
+
+            string timeLabel = dataGridView.Rows[row].Cells[0].Value?.ToString() ?? "";
+            Rectangle timeRect = new Rectangle(0, headerHeight + row * cellHeight, headerWidth, cellHeight);
+            g.DrawRectangle(pen, timeRect);
+            g.DrawString(timeLabel, font, Brushes.Black, timeRect, new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+
+            for (int col = 1; col < dataGridView.Columns.Count; col++)
+            {
+                string value = dataGridView.Rows[row].Cells[col].Value?.ToString() ?? "";
+                Rectangle rect = new Rectangle(headerWidth + (col - 1) * cellWidth, headerHeight + row * cellHeight, cellWidth, cellHeight);
+                g.DrawRectangle(pen, rect);
+                g.DrawString(value, font, Brushes.Black, rect, new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+            }
+        }
+    }
+
+    // 表示または保存
+    using (SaveFileDialog sfd = new SaveFileDialog { Filter = "PNG Image|*.png", FileName = "visual.png" })
+    {
+        if (sfd.ShowDialog() == DialogResult.OK)
+        {
+            bmp.Save(sfd.FileName, System.Drawing.Imaging.ImageFormat.Png);
+            MessageBox.Show("画像として保存しました。");
+        }
+    }
+}
+📷 出力例（見た目）
+yaml
+コピーする
+編集する
+         場所1   場所2   場所3
+09:00   1001             1003
+09:05           1002      
+09:10                   1004
+表形式と同じ構成で画像として出力
+
+番号が入っていない場所は空白
+
+✅ 拡張案（希望あれば）
+色で状態（例：番号あり → 青、なし → グレー）を塗り分け
+
+各場所に縦線／背景色を設定
+
+PNG以外にSVGやPDF保存対応
+
