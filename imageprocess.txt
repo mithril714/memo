@@ -1,0 +1,86 @@
+// imageProcess.cpp : このファイルには 'main' 関数が含まれています。プログラム実行の開始と終了がそこで行われます。
+//
+
+#include <iostream>
+#include <opencv2/opencv.hpp>
+#include <iostream>
+
+
+void imageThresholding(cv::Mat inImage, cv::Mat& outImage);
+int checkPeak(cv::Mat inImage,int height);
+
+int main() {
+    cv::Mat inImage = cv::imread("data1.bmp");
+    cvtColor(inImage, inImage, cv::COLOR_BGR2GRAY);
+    cv::Mat outImage;
+    if (inImage.empty()) {
+        std::cout << "画像の読み込みに失敗しました。" << std::endl;
+        return -1;
+    }
+
+    imageThresholding(inImage,outImage);
+    imwrite("data1_out.bmp",outImage);
+
+    return 0;
+}
+
+void imageThresholding(cv::Mat inImage, cv::Mat& outImage) {
+
+    int width = inImage.cols;
+    int height = inImage.rows;
+    int flg = 0;
+    int tmp = 0;
+    outImage = inImage.clone();
+
+    std::cout << "width:" << width << "height:" << height << std::endl;
+
+    for (int i = 0; i < height; i++) {
+        flg = 0;
+        for (int j = 0; j < width; j++) {
+            if (flg == 1) {
+//                std::cout << "x:" << j << "y:" << i << "a" << std::endl;
+                outImage.at<unsigned char>(i, j) = 0;
+            }else {
+                tmp = checkPeak(inImage, i);
+//                std::cout << tmp << std::endl;
+                if ( tmp == j && tmp != 0 ) {
+//                    std::cout << tmp << std::endl;
+                    outImage.at<unsigned char>(i, j) = 0;
+                    flg = 1;
+
+                }
+                else {
+//                    std::cout << "c" << std::endl;
+                    outImage.at<unsigned char>(i, j) = 255;
+                }
+            }
+        }
+    }
+    return;
+}
+
+int checkPeak(cv::Mat inImage,int height) {
+    
+    int width = inImage.cols;
+    int ret = 0;
+    int data1, data2, data3 = 0;
+    int diff = 0;
+    int tmp = 0;
+    int tap = 5;
+    for (int j = tap; j < width-tap; j++) {
+        data1 = inImage.at<unsigned char>(height,j-tap);
+        data2 = inImage.at<unsigned char>(height, j);
+        data3 = inImage.at<unsigned char>(height, j+tap);
+        if ((data1 <= data2) && (data2 >= data3)) {
+            diff = ((data2 - data1) + (data2 - data3));
+//            std::cout << tmp << std::endl;
+
+        }
+        if (diff > tmp) {
+            ret = j;
+            tmp = diff;
+        }
+    }
+//    std::cout << ret << " " << tmp << std::endl;
+    return ret;
+}
