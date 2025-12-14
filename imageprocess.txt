@@ -1,86 +1,171 @@
-// imageProcess.cpp : このファイルには 'main' 関数が含まれています。プログラム実行の開始と終了がそこで行われます。
-//
+int CalcAngleLong(cv::Mat &src, int r, int cx, int cy) {
 
-#include <iostream>
-#include <opencv2/opencv.hpp>
-#include <iostream>
-
-
-void imageThresholding(cv::Mat inImage, cv::Mat& outImage);
-int checkPeak(cv::Mat inImage,int height);
-
-int main() {
-    cv::Mat inImage = cv::imread("data1.bmp");
-    cvtColor(inImage, inImage, cv::COLOR_BGR2GRAY);
-    cv::Mat outImage;
-    if (inImage.empty()) {
-        std::cout << "画像の読み込みに失敗しました。" << std::endl;
-        return -1;
+    int pos_x = 0;
+    int pos_y = 0;
+    int pos = 0;
+    int cnt = 0;
+    int flg = 0;
+    int data = 0;
+    int w = 2;
+    for (int theta = 0; theta < 360; theta++) {
+//        std::cout << "theta:" << theta << std::endl;
+        pos_x = r * cos(theta * CV_PI/180.0) + cx;
+        pos_y = r * sin(theta * CV_PI / 180.0) + cy;
+        pos = pos_y * src.rows + pos_x;
+        data = src.data[pos];
+        if (data == 0) {
+            std::cout << "theta:" << theta << std::endl;
+            src.data[pos] = 255;
+            if (flg == 0) {
+                flg = 1;
+            }
+            else {
+                if (cnt < w) {
+                    std::cout << "theta:" << theta << std::endl;
+                    cnt++;
+                }
+                else {
+                    flg = 0;
+                    cnt = 0;
+                    return theta;
+                }
+            }
+        }
+        else {
+            flg = 0;
+            cnt = 0;
+        }
     }
-
-    imageThresholding(inImage,outImage);
-    imwrite("data1_out.bmp",outImage);
 
     return 0;
 }
 
-void imageThresholding(cv::Mat inImage, cv::Mat& outImage) {
+int CalcAngleShort(cv::Mat& src, int r, int cx, int cy,int angle_l) {
 
-    int width = inImage.cols;
-    int height = inImage.rows;
+    int pos_x = 0;
+    int pos_y = 0;
+    int pos = 0;
+    int cnt = 0;
     int flg = 0;
-    int tmp = 0;
-    outImage = inImage.clone();
-
-    std::cout << "width:" << width << "height:" << height << std::endl;
-
-    for (int i = 0; i < height; i++) {
-        flg = 0;
-        for (int j = 0; j < width; j++) {
-            if (flg == 1) {
-//                std::cout << "x:" << j << "y:" << i << "a" << std::endl;
-                outImage.at<unsigned char>(i, j) = 0;
-            }else {
-                tmp = checkPeak(inImage, i);
-//                std::cout << tmp << std::endl;
-                if ( tmp == j && tmp != 0 ) {
-//                    std::cout << tmp << std::endl;
-                    outImage.at<unsigned char>(i, j) = 0;
-                    flg = 1;
-
+    int data = 0;
+    int w = 5;
+    for (int theta = 0; theta < 360; theta++) {
+        //        std::cout << "theta:" << theta << std::endl;
+        if(theta == angle_l){
+            continue;
+        }
+        pos_x = r * cos(theta * CV_PI / 180.0) + cx;
+        pos_y = r * sin(theta * CV_PI / 180.0) + cy;
+        pos = pos_y * src.rows + pos_x;
+        data = src.data[pos];
+        if (data == 0) {
+            //            std::cout << "theta:" << theta << std::endl;
+            src.data[pos] = 255;
+            if (flg == 0) {
+                flg = 1;
+            }
+            else {
+                if (cnt < w) {
+                    //                    std::cout << "theta:" << theta << std::endl;
+                    cnt++;
                 }
                 else {
-//                    std::cout << "c" << std::endl;
-                    outImage.at<unsigned char>(i, j) = 255;
+                    flg = 0;
+                    cnt = 0;
+                    return theta;
                 }
             }
         }
+        else {
+            flg = 0;
+            cnt = 0;
+        }
     }
-    return;
+
+    return 0;
 }
 
-int checkPeak(cv::Mat inImage,int height) {
-    
-    int width = inImage.cols;
-    int ret = 0;
-    int data1, data2, data3 = 0;
-    int diff = 0;
-    int tmp = 0;
-    int tap = 5;
-    for (int j = tap; j < width-tap; j++) {
-        data1 = inImage.at<unsigned char>(height,j-tap);
-        data2 = inImage.at<unsigned char>(height, j);
-        data3 = inImage.at<unsigned char>(height, j+tap);
-        if ((data1 <= data2) && (data2 >= data3)) {
-            diff = ((data2 - data1) + (data2 - data3));
-//            std::cout << tmp << std::endl;
+int CalcMatchAngle(cv::Mat &src, cv::Mat &dst, int r1,int r2,int cx,int cy) {
 
-        }
-        if (diff > tmp) {
-            ret = j;
-            tmp = diff;
+    // src と少し回転させたdstである領域でのdiffをとって小さいところが一致したところ
+    int pos_x = 0;
+    int pos_y = 0;
+    int pos = 0;
+    int data = 0;
+    int r = 0;
+    int sum_12 = 0;
+    int sum = 0;
+    int diff = 255 * 512 * 512;
+    int idx = 0;
+
+    //たぶん12のところ
+    for (int r = r1; r < r2; r++) {
+        for (int theta = 260; theta < 280; theta++) {
+            pos_x = r * cos(theta * CV_PI / 180.0) + cx;
+            pos_y = r * sin(theta * CV_PI / 180.0) + cy;
+            pos = pos_y * src.rows + pos_x;
+            sum_12+= src.data[pos];
+            src.data[pos] = 128;
         }
     }
-//    std::cout << ret << " " << tmp << std::endl;
-    return ret;
+
+    std::cout << "sum_12:" << sum_12 << std::endl;
+
+
+	for (int dt = 0; dt < 360; dt++) {
+        sum = 0;
+        for (int r = r1; r < r2; r++) {
+            for (int theta = 260 + dt; theta < 280 + dt; theta++) {
+                pos_x = r * cos(theta * CV_PI / 180.0) + cx;
+                pos_y = r * sin(theta * CV_PI / 180.0) + cy;
+                pos = pos_y * dst.rows + pos_x;
+                sum += dst.data[pos];
+//                dst.data[pos] = 128;
+            }
+        }
+        std::cout << "dt:" << dt << std::endl;
+        std::cout << "sum:" << sum << std::endl;
+        if (abs(sum_12 - sum) < diff) {
+            diff = abs(sum_12 - sum);
+            idx = dt;
+        }        
+	}
+
+    std::cout << "idx:" << idx << std::endl;
+    std::cout << "diff:" << diff << std::endl;
+
+
+    return 0;
+}
+
+
+
+
+
+cv::Mat CalcAnalogClock(cv::Mat src) {
+
+    cv::Mat dst;
+    int thresh = 128;
+    cv::threshold(src, dst, thresh, 255.0,cv::THRESH_BINARY);
+   
+    int angle_s = 0;
+    int angle_l = 0;
+
+    int cx = 630;
+    int cy = 630;
+
+    angle_l = CalcAngleLong(dst, 315, cx, cy);
+    std::cout << "angle_l:" << angle_l << std::endl;
+    angle_s = CalcAngleShort(dst, 100, cx, cy,angle_l);
+    std::cout << "angle_s:" << angle_s << std::endl;
+
+    cv::Mat _src;
+    cv::Mat _dst;
+    _src = cv::imread("D:\\work\\analog.bmp");
+    _src = ensure_gray_1ch(_src);
+    cv::threshold(_src, _dst, thresh, 255.0, cv::THRESH_BINARY);
+
+    CalcMatchAngle(dst, _dst, 368, 461, cx, cy);
+
+    return _dst;
 }
