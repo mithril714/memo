@@ -191,7 +191,7 @@ cv::Mat PerspectiveTransform(cv::Mat src) {
     if (src.empty()) {
         std::cerr << "failed to load input file\n";
     }
-    // ---- ここをあなたの画像に合わせて指定（TL,TR,BR,BL）----
+    // ---- ここを指定（TL,TR,BR,BL）----
     Vec2 srcPts[4] = {
         {150, 300}, // TL
         {450, 150}, // TR
@@ -199,7 +199,7 @@ cv::Mat PerspectiveTransform(cv::Mat src) {
         {230, 460}  // BL
     };
 
-    // 出力の4点（例：矩形に正規化）
+    // 出力の4点
     int outW = 500, outH = 250;
     Vec2 dstPts[4] = {
         {0, 0},
